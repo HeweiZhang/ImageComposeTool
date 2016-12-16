@@ -11,6 +11,7 @@ import android.graphics.Path;
 import android.graphics.RectF;
 import android.graphics.Region;
 import android.util.AttributeSet;
+import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
 
@@ -32,7 +33,7 @@ public class PuzzleView extends View {
     private Context context;
     private Path[] path;
     private Bitmap[] bitmaps;
-    private boolean[] bitmapsFlag;
+    private boolean[] bitmapsFlag;//标记图片是否正在移动
     private float[][] pathLT;
     private float[][] pathOffset;
     private int pathNum;
@@ -40,7 +41,9 @@ public class PuzzleView extends View {
     private int leftMargin;
     private List<ImageBean> pics;
     private final static int MARGIN_HEIGHT = 100;
-    private List<ImageItem> coordinateSetList;
+    private List<ImageItem> coordinateSetList;//图片坐标
+    private float[][] bitmapPos; // 存放最终合成图片在大图中的起点
+    private float[] scaleSizes;//用来存放最终合成照片时每张图的缩放比
 
 
     public PuzzleView(Context context) {
@@ -62,6 +65,13 @@ public class PuzzleView extends View {
 
     public void setPathCoordinate(List<ImageItem> pathCoordinate) {
         this.coordinateSetList = pathCoordinate;
+        //获取保存读片是小图的起点
+        bitmapPos = new float[pathCoordinate.size()][2];
+        for (int i = 0; i < pathCoordinate.size(); i++) {//8张图:单位：dp
+            bitmapPos[i][0] = pathCoordinate.get(i).getCoordinates().get(0).getX();
+            bitmapPos[i][1] = pathCoordinate.get(i).getCoordinates().get(0).getY();
+            Log.e("info", "第" + i + "图绘画起点" + bitmapPos[i][0] + "," + bitmapPos[i][1]);
+        }
         initPath();
     }
 
@@ -69,7 +79,7 @@ public class PuzzleView extends View {
 
         leftMargin = (AppUtil.getScreenWidth(context) - dp2px(320)) / 2;
         viewWdh = dp2px(320);
-        viewHgt = dp2px(450);
+        viewHgt = dp2px(460);//TODO：当前只适配了图片量为8的 这边的宽高应该跟assets下json中的坐标最大值一致（dp）
         pics = new ArrayList<>();
         if (imageBeans != null) {
             pics.addAll(imageBeans);
@@ -77,11 +87,15 @@ public class PuzzleView extends View {
         pathNum = pics.size();
     }
 
+    /**
+     * 最终效果中 边界（包括小图间分割线）只是背景 跟绘制无关
+     */
     private void initPath() {
         path = new Path[pathNum];
         for (int i = 0; i < pathNum; i++) {
             path[i] = new Path();
         }
+        //初始化
         bitmapsFlag = new boolean[pathNum];
 
         pathLT = new float[pathNum][2];
@@ -111,18 +125,25 @@ public class PuzzleView extends View {
         bitmaps = new Bitmap[pathNum];
         for (int i = 0; i < pathNum; i++) {
             BitmapFactory.Options opt = new BitmapFactory.Options();
+            //设为true，那么BitmapFactory.decodeFile(String path, Options opt)并不会真的返回一个Bitmap给你，
+            // 它仅仅会把它的宽，高取回来给你，这样就不会占用太多的内存，也就不会那么频繁的发生OOM了。
             opt.inJustDecodeBounds = true;
             BitmapFactory.decodeFile(pics.get(i).path, opt);
 
             int bmpWdh = opt.outWidth;
             int bmpHgt = opt.outHeight;
 
+            //得到每张图的坐标；这里代表的实际值为每张图在控件中的宽跟高
             Coordinates coordinate = caculateViewSize(coordinateSetList.get(i).getCoordinates());
+            Log.e("info", "每张小图的实际宽高：" + coordinate.getX() + "," + coordinate.getY());
+
             int size = caculateSampleSize(bmpWdh, bmpHgt, dp2px(coordinate.getX()), dp2px(coordinate.getY()));
             opt.inJustDecodeBounds = false;
-            opt.inSampleSize = size;
+            opt.inSampleSize = size;//图片比现实控件大的时候按比例加载缩列图，优化内存
 
             bitmaps[i] = scaleImage(BitmapFactory.decodeFile(pics.get(i).path, opt), dp2px(coordinate.getX()), dp2px(coordinate.getY()));
+
+//            scaleSizes[i] = Math.max((float) (bitmapPos[i][0] / bmpWdh), bitmapPos[i][1] / bmpWdh);//单位统一已dp来计算
         }
     }
 
@@ -254,24 +275,40 @@ public class PuzzleView extends View {
         }
     }
 
+    /**
+     * 绘制bitMap
+     *
+     * @param canvas
+     * @param paint
+     * @param idx
+     */
     private void drawScene(Canvas canvas, Paint paint, int idx) {
         canvas.clipPath(path[idx]);
         canvas.drawColor(Color.GRAY);
-        if (bitmapsFlag[idx]) {
+        if (bitmapsFlag[idx]) {//对应图片正在移动
             canvas.drawBitmap(bitmaps[idx], dp2px(caculateMinCoordinateX(coordinateSetList.get(idx).getCoordinates())) + pathOffsetX + pathOffset[idx][0],
                     dp2px(caculateMinCoordinateY(coordinateSetList.get(idx).getCoordinates())) + pathOffsetY + pathOffset[idx][1], paint);
         } else {
             canvas.drawBitmap(bitmaps[idx], dp2px(caculateMinCoordinateX(coordinateSetList.get(idx).getCoordinates())) + pathOffset[idx][0],
                     dp2px(caculateMinCoordinateY(coordinateSetList.get(idx).getCoordinates())) + pathOffset[idx][1], paint);
         }
+
+    }
+
+    public Bitmap[] getBitmaps() {
+        return bitmaps;
+    }
+
+    public float[][] getBitmapPos() {
+        return bitmapPos;
     }
 
     private int dp2px(float point) {
         return DensityUtil.dip2px(getContext(), point);
     }
 
-    float ptx, pty;
-    float pathOffsetX, pathOffsetY;
+    float ptx, pty;//拖动起始位置：ACTION_DOWN
+    float pathOffsetX, pathOffsetY;//偏移量
 
     @Override
     public boolean onTouchEvent(MotionEvent event) {

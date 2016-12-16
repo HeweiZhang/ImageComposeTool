@@ -40,7 +40,7 @@ public class PuzzlePickerActivity extends Activity implements View.OnClickListen
     private RecyclerView picAllRv;
     private RecyclerView picSelectRv;
     private final static int MIN_CHOOSE_PIC = 2;
-    private final static int MAX_CHOOSE_PIC = 5;
+    private final static int MAX_CHOOSE_PIC = 8;
     private int choosePicNum = 0;
     private Context context;
     private ImageGroup mCurrentGroup;
@@ -119,7 +119,7 @@ public class PuzzlePickerActivity extends Activity implements View.OnClickListen
     }
 
     private void setChoosePicText(int picNum) {
-        picChooseTv.setText(String.format("已选择%d张照片(最多选择5张)", picNum));
+        picChooseTv.setText(String.format("已选择%d张照片(最多选择8张)", picNum));
     }
 
     private void intentToPuzzle() {

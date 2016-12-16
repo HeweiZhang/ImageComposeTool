@@ -11,14 +11,15 @@
 
     <LinearLayout
         android:id="@+id/puzzle_ll"
-        android:layout_width="320dp"
+        android:layout_width="330dp"
         android:layout_height="wrap_content"
         android:layout_below="@+id/top_view"
         android:layout_centerHorizontal="true"
         android:layout_marginTop="30dp"
-        android:padding="5dp"
         android:background="#ffffff"
-        android:orientation="vertical">
+        android:orientation="vertical"
+        android:padding="5dp">
+
 
         <com.dd.test.puzzleview_android.activity.view.PuzzleView
             android:id="@+id/puzzle_view"
